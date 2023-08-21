@@ -1,3 +1,7 @@
 fastapi
 uvicorn
-mangum
+opencv-python-headless
+moviepy
+gunicorn
+python-multipart
+dropbox
