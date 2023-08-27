@@ -327,7 +327,26 @@ async def combine_videos(files: List[UploadFile] = File(...), audio: UploadFile 
         print("Found Audio")
         # Trim audio clip to match the duration of the video
         audio = AudioFileClip(audios).subclip(0, combined.duration)
-        composite_audio = CompositeAudioClip([audio, aud1, aud2, aud3])
+        
+        
+        composite_audio = CompositeAudioClip([audio])
+
+        try:
+            composite_audio = CompositeAudioClip([composite_audio, aud1])
+        except:
+            pass
+
+        try:
+            composite_audio = CompositeAudioClip([composite_audio, aud2])
+        except:
+            pass
+
+        try:
+            composite_audio = CompositeAudioClip([composite_audio, aud3])
+        except:
+            pass
+            
+        
         combined = combined.set_audio(composite_audio)
         if combined.duration > 30:
             combined = combined.subclip(0, 0 + length)
