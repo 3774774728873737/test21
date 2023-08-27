@@ -16,10 +16,11 @@ import time
 import random
 import string
 global audioname
+global outputn
 from collections import Counter
 
 audioname = None
-
+outputn = None
 
 app = FastAPI()
 
@@ -33,10 +34,7 @@ app.add_middleware(
 
 
 def resize_videos(clips, width, height):
-
-
     duration_limit = 30  # in seconds
-
     outnames = []
     file1 = generate_unique_filename()
 
@@ -146,6 +144,12 @@ def concatenate_videos(input_files, output_file):
 
     final_clip.write_videofile(output_file) 
 
+    # close the clips
+    for clip in clips:
+        clip.close()
+    for x in input_files:
+        os.remove(x)
+
     return output_file
 
 
@@ -170,6 +174,19 @@ async def upload_audio(file: UploadFile = File(...)):
     return {"message": "Videos uploaded successfully"}
 
 
+
+@app.post("/flagging")
+async def flagging():
+    if outputn is not None:
+        os.remove(outputn)
+    else:
+        print("No outputn")
+    return {"message": "Videos uploaded successfully"}
+
+
+
+
+
 @app.post("/upload-videos")
 async def upload_videos(files: List[UploadFile] = File(...)):
     print(files)
@@ -184,16 +201,21 @@ async def upload_videos(files: List[UploadFile] = File(...)):
 
 @app.post("/upload")
 async def upload_file(file: UploadFile = File(...), videoNumber: int = Form(...)):
-    with open(f"video{videoNumber}.mp4", "wb") as f:
+
+    file1 = generate_unique_filename()
+    with open(f"{file1}{videoNumber}.mp4", "wb") as f:
         f.write(await file.read())
 
     # Generate thumbnail image for the uploaded video
-    video_capture = cv2.VideoCapture(f"video{videoNumber}.mp4")
+    video_capture = cv2.VideoCapture(f"{file1}{videoNumber}.mp4")
     success, frame = video_capture.read()
     if success:
         # Save the thumbnail as a temporary file
-        thumbnail_path = f"thumbnail{videoNumber}23.jpg"
+        thumbnail_path = f"{file1}{videoNumber}23.jpg"
         cv2.imwrite(thumbnail_path, frame)
+
+        # release 
+        video_capture.release()
 
         # Read the thumbnail image and convert it to base64
         with open(thumbnail_path, "rb") as thumbnail_file:
@@ -203,9 +225,13 @@ async def upload_file(file: UploadFile = File(...), videoNumber: int = Form(...)
     else:
         thumbnail_base64 = None
 
-        
-    return JSONResponse({"message": "Video uploaded successfully", "imagePath": thumbnail_base64})
 
+    os.remove(f"{file1}{videoNumber}.mp4")
+    
+    try:
+        return JSONResponse({"message": "Video uploaded successfully", "imagePath": thumbnail_base64})
+    finally:
+        os.remove(thumbnail_path)
 
 
 def generate_unique_filename():
@@ -219,7 +245,7 @@ def generate_unique_filename():
 
 @app.post("/combine")
 async def combine_videos(files: List[UploadFile] = File(...), audio: UploadFile = File(None), videoNumber: str = Form(...)):
-
+    global outputn
     file1 = generate_unique_filename()
     audionames = generate_unique_filename()
     outputname = generate_unique_filename()
@@ -288,6 +314,7 @@ async def combine_videos(files: List[UploadFile] = File(...), audio: UploadFile 
     length = 30
 
     output_file = f"{outputname}.mp4"
+    outputn = output_file
 
 
     if audios == "":
@@ -305,6 +332,17 @@ async def combine_videos(files: List[UploadFile] = File(...), audio: UploadFile 
         if combined.duration > 30:
             combined = combined.subclip(0, 0 + length)
         combined.write_videofile(output_file)
+        audio.close()
+        os.remove(audios)
+
+
+    os.remove(video1)
+    os.remove(video2)
+    os.remove(video3)
+
+
+    for i in range(1, 4):
+        os.remove(f"{file1}{i}.mp4")
     
-    
+
     return FileResponse(output_file, media_type="video/mp4")
